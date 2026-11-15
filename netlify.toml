@@ -1,0 +1,6 @@
+[build]
+  base = "client"
+  command = "npm run build"
+  publish = "dist"
+
+# Vite builds a static React site. The Express API is deployed separately on Render.
