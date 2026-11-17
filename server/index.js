@@ -50,6 +50,8 @@ app.get('/api/health', (_req, res) => {
 })
 
 // Contact form
+
+// Contact form
 app.post('/api/contact', async (req, res) => {
   try {
     const { name, email, message } = req.body || {}
@@ -57,11 +59,15 @@ app.post('/api/contact', async (req, res) => {
     if (![name, email, message].every(
       value => typeof value === 'string' && value.trim()
     )) {
-      return res.status(400).json({ message: 'Please complete all fields.' })
+      return res.status(400).json({
+        message: 'Please complete all fields.'
+      })
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      return res.status(400).json({ message: 'Please enter a valid email.' })
+      return res.status(400).json({
+        message: 'Please enter a valid email.'
+      })
     }
 
     if (mongoose.connection.readyState !== 1) {
@@ -70,40 +76,49 @@ app.post('/api/contact', async (req, res) => {
       })
     }
 
+    // Save enquiry in MongoDB first
     const enquiry = await Enquiry.create({
-      name,
-      email,
-      message
+      name: name.trim(),
+      email: email.trim(),
+      message: message.trim()
     })
 
-    // Send notification email without losing the saved enquiry
-    try {
-      await transporter.sendMail({
-        from: process.env.GMAIL_USER,
-        to: process.env.NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL,
-        subject: 'New Portfolio Enquiry',
-        text: `New enquiry received.
+    // Send notification email in background
+    transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: process.env.NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL,
+      replyTo: enquiry.email,
+      subject: 'New Portfolio Enquiry',
+      text: `New enquiry received.
 
 Name: ${enquiry.name}
 Email: ${enquiry.email}
 
 Message:
 ${enquiry.message}`
-      })
-    } catch (mailError) {
-      console.error('Notification email failed:', mailError.message)
-    }
-
-    return res.status(201).json({
-      message: 'Thank you! Your enquiry has been received.'
     })
+    .then(() => {
+      console.log('Notification email sent successfully')
+    })
+    .catch(error => {
+      console.error('Notification email failed:', error.message)
+    })
+
+    // Respond immediately after saving enquiry
+    return res.status(201).json({
+      message: 'Thank you! Your enquiry has been received.',
+      success: true
+    })
+
   } catch (error) {
     console.error('Contact submission error:', error.message)
+
     return res.status(500).json({
       message: 'Something went wrong. Please try again later.'
     })
   }
 })
+
 
 // Admin login
 app.post('/api/admin/login', async (req, res) => {
